@@ -12,8 +12,12 @@ module ActiveRecord
     end
 
     TokenDefinition = Struct.new(:defining_class, :purpose, :expires_in, :block) do # :nodoc:
+      def resolved_expires_in
+        expires_in.is_a?(Proc) ? expires_in.call : expires_in
+      end
+
       def full_purpose
-        @full_purpose ||= [defining_class.name, purpose, expires_in].join("\n")
+        [defining_class.name, purpose, resolved_expires_in].join("\n")
       end
 
       def message_verifier
@@ -25,7 +29,7 @@ module ActiveRecord
       end
 
       def generate_token(model)
-        message_verifier.generate(payload_for(model), expires_in: expires_in, purpose: full_purpose)
+        message_verifier.generate(payload_for(model), expires_in: resolved_expires_in, purpose: full_purpose)
       end
 
       def resolve_token(token)
