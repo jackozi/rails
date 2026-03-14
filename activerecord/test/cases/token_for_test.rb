@@ -11,6 +11,8 @@ class TokenForTest < ActiveRecord::TestCase
   class User < ::User
     generates_token_for :lookup
 
+    generates_token_for :dynamically_expiring_lookup, expires_in: -> { 1.minute }
+
     generates_token_for :password_reset, expires_in: 15.minutes do
       password_digest.to_s[-(31 + 22), 10] # first 10 characters of BCrypt salt
     end
@@ -26,6 +28,7 @@ class TokenForTest < ActiveRecord::TestCase
 
     @user = User.create!(password_digest: "$2a$4$#{"x" * 22}#{"y" * 31}")
     @lookup_token = @user.generate_token_for(:lookup)
+    @dynamically_expiring_lookup_token = @user.generate_token_for(:dynamically_expiring_lookup)
     @password_reset_token = @user.generate_token_for(:password_reset)
   end
 
@@ -36,6 +39,11 @@ class TokenForTest < ActiveRecord::TestCase
   test "finds record by token" do
     assert_equal @user, User.find_by_token_for(:lookup, @lookup_token)
     assert_equal @user, User.find_by_token_for!(:lookup, @lookup_token)
+  end
+
+  test "finds a record when expires in is a proc and the token has not expired" do
+    assert_equal @user, User.find_by_token_for(:dynamically_expiring_lookup, @dynamically_expiring_lookup_token)
+    assert_equal @user, User.find_by_token_for!(:dynamically_expiring_lookup, @dynamically_expiring_lookup_token)
   end
 
   test "returns nil when record is not found" do
@@ -77,6 +85,14 @@ class TokenForTest < ActiveRecord::TestCase
     assert_nil User.find_by_token_for(:password_reset, @password_reset_token)
     assert_raises(ActiveSupport::MessageVerifier::InvalidSignature) do
       User.find_by_token_for!(:password_reset, @password_reset_token)
+    end
+  end
+
+  test "does not find a record when expires in is a proc and the token has expired" do
+    travel 2.minutes
+    assert_nil User.find_by_token_for(:dynamically_expiring_lookup, @dynamically_expiring_lookup_token)
+    assert_raises(ActiveSupport::MessageVerifier::InvalidSignature) do
+      User.find_by_token_for!(:dynamically_expiring_lookup, @dynamically_expiring_lookup_token)
     end
   end
 

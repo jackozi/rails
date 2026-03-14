@@ -1,3 +1,11 @@
+*   Allow procs in generates_token_for expires_at.
+
+    ```ruby
+    generates_token_for :thing, expires_in: -> { Current.user.timeout }
+    ```
+
+    *Jacko Zuidema*
+
 *   Support PostgreSQL `RESET` on readonly queries.
 
     ```ruby
